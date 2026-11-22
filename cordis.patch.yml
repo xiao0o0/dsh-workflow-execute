@@ -1,0 +1,13 @@
+# dsh-workflow-execute bundle patch: contributes the plugin row into the host composition
+# when this package is installed via `dsh plugin add`.
+#
+# HOST-PLANE plugin: scans the workflow library (~/.rjWorkflow/workflows writable
+# + ~/.rjWorkflow/bundled/workflows read-only), serves same-origin JSON + SSE routes
+# under /dsh-workflow-execute/*, registers the workflow_* agent tools and a short systemPrompt
+# section. The `dsh.client` declaration in package.json makes the browser half
+# (client/bundle.js) load in the web GUI. It must land in the host composition
+# (this insert), never inside an agent preset.
+
+- insert:
+    - id: dsh-workflow-execute
+      name: 'dsh-workflow-execute'
