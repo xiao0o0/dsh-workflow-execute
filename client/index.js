@@ -2211,15 +2211,35 @@ function SettingsDialog({ state, controller, t }) {
 const AI_PROMPT = `请为下面的需求设计一个工作流（Process：多阶段 phase、多环节 link 的 agent 工作流模板），输出严格的 YAML。
 
 需求：{{requirement}}
-复杂度：{{complexity}}
+复杂度：{{complexity}}（只接受 low / medium / high，即低 / 中 / 高；留空按 medium）
 {{reference}}
 
 硬性要求：
 1. 只输出一个 \`\`\`yaml 代码块，不要任何其他解释文字。
-2. 顶层结构：process（name / guid：生成一个 uuid v4 / display_name / description / category: software / complexity / version: 1.0.0）+ limits（max_step_executions / max_total_tokens，可为 null）+ abnormal_handler（可为 null）+ phases 列表。
-3. 每个 phase：id、name、spec、acceptance_criteria、links 列表。每个 link：id（全工作流唯一，建议简短助记如 req-01）、name、prompt（明确可执行的指令，含产物落点）、executor、expert（专家库里的名字，不确定就 null）、skills（列表）、expected_artifacts（[{name, type: file, path}]）、gates（[{name, type: ai_criteria_review, min_score}]，可选）、on_success（next / end / <环节id>）、on_gate_fail（break / <环节id> / goto:<环节id>）、on_rating_fail: break、max_rework（0-3）。
-4. on_success / on_gate_fail 引用的环节 id 必须真实存在；最后一步用 on_success: end。
-5. 阶段数量与环节粒度贴合复杂度：轻需求 1-2 阶段 3-6 环节；复杂需求 3+ 阶段。`
+2. 顶层只有四个键：process、limits、phases、abnormal_handler。
+   - process：name（英文小写短横线，如 bugfix-flow）/ guid（UUID v4）/ display_name（中文名）/ description / category: software / complexity（low|medium|high）/ version: 1.0.0；不要写其他键。
+   - limits：max_step_executions（整数，如 30）/ max_total_tokens（null 或整数）。
+   - abnormal_handler：一般写 null。
+3. 每个 phase：id、name、spec、acceptance_criteria（阶段完成标准）、links。
+4. 每个 link 必须写：
+   - id：全工作流唯一，简短助记（如 req-01、code-02）；
+   - name：环节名；
+   - prompt：给执行 agent 的可执行指令，必须写清「做什么、产物落到哪个路径、按什么口径交付」；
+   - acceptance_criteria：本环节验收标准，逐条可判定（门禁判分与 agent 执行都依据它）；
+   - review_type：ai | human | none
+     · ai（默认）：跑完由 AI 按 gates 打分，低于 min_score 按 on_gate_fail 处理；
+     · human：跑完即停下，等人在面板上通过或打回，此类型不写 gates；
+     · none：不做任何复核，直接按 on_success 流转，此类型不写 gates；
+   - gates：仅 review_type: ai 时写，[{name: 评审项, type: ai_criteria_review, min_score: 整数}]；一个环节可多条，按最低分判定；
+   - expected_artifacts：[{name: 中文名, type: file, path: workflow/<流程名>/xxx.md}]，path 必须是真实落盘位置；
+   - on_success：next / end / goto:<环节id>；
+   - on_gate_fail：break / goto:<环节id>（break = 停下等人裁决）；
+   - max_rework：0-3；
+   - 可选：skills（[技能名]，只写本机技能目录里真实存在的名字，不确定就给空数组）；review_prompt（门禁评审口径，不给就不写这个键）。
+5. 不要生成 executor、expert、model、step_template、on_rating_fail —— 运行时不用，面板也不显示。
+6. 所有 goto:/on_success/on_gate_fail 引用的环节 id 必须真实存在；最后一步用 on_success: end。
+7. 阶段与环节数量贴合复杂度：low → 1-2 阶段、3-5 环节；medium → 2-3 阶段、5-7 环节；high → 3+ 阶段、7+ 环节。
+8. 产物统一落在 workflow/<流程名>/ 下，每个环节至少一个产物。`
 
 function AiPreview({ controller, t, output, close }) {
   const parsedBlock = useMemo(() => {
